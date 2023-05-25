@@ -6,10 +6,10 @@ export interface Token {
                             of a jsx depend on the grammar. An 
                             another example can be a object 
                             property named like a keyword.*/
-    Indent: number, /* The indentation value */
-    Value: string,  /* The value of the token */
-    SOL: boolean    /* True if is the first token of the line */
-    EOL: boolean    /* True if is the last token of the line */
+    Indent?: number | null,/* The indentation value */
+    Value: string,         /* The value of the token */
+    SOL: boolean           /* True if is the first token of the line */
+    EOL: boolean           /* True if is the last token of the line */
 }
 
 export interface TokenMatch {
@@ -19,6 +19,7 @@ export interface TokenMatch {
 }
 
 export interface TokenizerConfig {
+    UseIdent?: boolean,
     TabIndentConst?: number,
     Matchers: Array<TokenMatch>
 }
@@ -33,13 +34,16 @@ export function tokenize(source: string, config: TokenizerConfig): Array<Token> 
     let tabIndentConst = config.TabIndentConst ?? 4;
 
     while (carret < source.length) {
-        let indent = 0;
-        while (1) {
-            if (source[carret] == ' ') indent++;
-            else if (source[carret] == '\t') indent += tabIndentConst;
-            else if (source[carret] == '\n') { indent = 0; sol = true; }
-            else break;
-            carret++;
+        let indent = -1;
+        if (config.UseIdent ?? false) {
+            indent = 0;
+            while (1) {
+                if (source[carret] == ' ') indent++;
+                else if (source[carret] == '\t') indent += tabIndentConst;
+                else if (source[carret] == '\n') { indent = 0; sol = true; }
+                else break;
+                carret++;
+            }
         }
 
         let r: any = null, idx: number = -1;
@@ -52,18 +56,29 @@ export function tokenize(source: string, config: TokenizerConfig): Array<Token> 
             }
         }
 
-        if ((!r && carret < source.length) || idx == -1) { throw new Error("Unexpected token"); }
+        if ((!r && carret < source.length) || idx == -1) { throw new Error(`Unexpected token @${carret}: > ${source[carret]}`); }
         else {
             if (sol && tokens.length > 0) { tokens[tokens.length-1].EOL = true; }
 
-            tokens.push({
-                Name: config.Matchers[idx].Name,
-                Category: config.Matchers[idx].Category ?? [],
-                Indent: indent,
-                Value: r[0],
-                SOL: sol,
-                EOL: false
-            })
+            if (config.UseIdent ?? false) {
+                tokens.push({
+                    Name: config.Matchers[idx].Name,
+                    Category: config.Matchers[idx].Category ?? [],
+                    Indent: indent,
+                    Value: r[0],
+                    SOL: sol,
+                    EOL: false
+                })
+            }
+            else {
+                tokens.push({
+                    Name: config.Matchers[idx].Name,
+                    Category: config.Matchers[idx].Category ?? [],
+                    Value: r[0],
+                    SOL: sol,
+                    EOL: false
+                })
+            }
         }
 
         carret += r[0].length;
